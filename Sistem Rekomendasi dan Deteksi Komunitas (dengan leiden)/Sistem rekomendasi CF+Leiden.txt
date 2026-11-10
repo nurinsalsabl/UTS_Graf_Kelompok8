@@ -1,0 +1,47 @@
+// // Cek 5 film dan ID komunitas Leiden-nya
+// MATCH (m:Movie) 
+// WHERE m.leidenId IS NOT NULL
+// RETURN m.title AS film, m.leidenId AS komunitas_leiden, m.louvainId AS komunitas_louvain
+// LIMIT 5;
+
+
+// // =================================================================
+// // EVALUASI KESELURUHAN: RMSE, MAE, & PRECISION@10 (LEIDEN COMMUNITY)
+// // =================================================================
+// MATCH (u:User)-[test:RATED_TEST]->(rec:Movie)
+// MATCH (u)-[r:RATED]->(m:Movie)
+// WHERE r.rating >= 4.0
+
+// // Hubungkan via relasi kemiripan Cosine dari data latih
+// MATCH (m)-[s:SIMILAR_COS]-(rec)
+
+// // Filter Komunitas: Film rekomendasi harus dalam Komunitas Leiden yang SAMA
+// WHERE rec.leidenId = m.leidenId 
+
+// WITH u, rec, test.rating AS aktual_rating,
+//      sum(s.weight * r.rating) / sum(s.weight) AS prediksi_rating
+// WHERE prediksi_rating IS NOT NULL
+
+// WITH u, rec, aktual_rating, prediksi_rating,
+//      abs(prediksi_rating - aktual_rating) AS error_abs,
+//      (prediksi_rating - aktual_rating) * (prediksi_rating - aktual_rating) AS error_sq
+
+// // Hitung Evaluasi Per-User untuk Precision@10 (threshold disukai: rating aktual >= 4.0)
+// WITH u,
+//      count(rec) AS total_item_terprediksi,
+//      avg(error_abs) AS mae_user,
+//      avg(error_sq) AS mse_user,
+//      sum(CASE WHEN aktual_rating >= 4.0 THEN 1 ELSE 0 END) AS item_relevan
+
+// RETURN count(DISTINCT u) AS total_user_dievaluasi,
+//        round(avg(sqrt(mse_user)), 4) AS Global_RMSE,
+//        round(avg(mae_user), 4) AS Global_MAE,
+//        round(avg(toFloat(item_relevan) / CASE WHEN total_item_terprediksi > 10 THEN 10 ELSE total_item_terprediksi END), 4) AS Global_Precision_At_10;
+
+MATCH (u:User {userId: 1})-[r:RATED]->(m:Movie)
+WHERE r.rating >= 4.0
+MATCH (m)-[s:SIMILAR_COS]-(rec:Movie)
+WHERE rec.louvainId = m.louvainId 
+  AND NOT (u)-[:RATED]->(rec)
+RETURN u, r, m, s, rec
+LIMIT 20;
