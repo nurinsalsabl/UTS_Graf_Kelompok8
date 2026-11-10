@@ -1,0 +1,41 @@
+MATCH ()-[r:RATED]->() RETURN 'latih' AS jenis, count(r) AS jumlah
+UNION ALL
+MATCH ()-[t:RATED_TEST]->() RETURN 'uji' AS jenis, count(t) AS jumlah;
+
+MATCH (m:Terhubung)
+RETURN m.louvainId AS komunitas, count(*) AS film, round(avg(m.likes), 1) AS rata_likes
+ORDER BY film DESC;
+
+MATCH (m:Terhubung) WITH m.leidenId AS c, m ORDER BY m.likes DESC
+WITH c, collect(m.title)[0..8] AS film_teratas, count(*) AS n
+WHERE n > 1
+RETURN c, n, film_teratas ORDER BY n DESC;
+
+MATCH (m:Terhubung) WITH m.louvainId AS c, m ORDER BY m.likes DESC
+WITH c, collect(m.title)[0..8] AS film_teratas, count(*) AS n
+WHERE n > 1
+RETURN c, n, film_teratas ORDER BY n DESC;
+
+MATCH (m:Terhubung)
+RETURN m.leidenId AS leiden, m.louvainId AS louvain, count(*) AS film
+ORDER BY film DESC LIMIT 10;
+
+MATCH (a:Terhubung)-[s:SIMILAR_COS]->(b:Terhubung)
+WHERE a.leidenId = b.leidenId AND a.leidenId IN [0, 1, 2]
+RETURN a, s, b
+ORDER BY s.weight DESC
+LIMIT 150;
+
+MATCH (a:Terhubung)-[s:SIMILAR_COS]->(b:Terhubung)
+WHERE a.louvainId = b.louvainId AND a.louvainId IN [1431, 759, 34]
+RETURN a, s, b
+ORDER BY s.weight DESC
+LIMIT 150;
+
+CALL gds.wcc.stats('cosGraph')
+YIELD componentCount, componentDistribution
+RETURN componentCount, componentDistribution.max AS komponen_terbesar;
+
+MATCH (m:Terhubung)
+WITH m, COUNT { (m)-[:SIMILAR_COS]-() } AS garis
+RETURN count(*) AS film, round(avg(garis), 1) AS rata_rata, max(garis) AS terbanyak, min(garis) AS tersedikit;
