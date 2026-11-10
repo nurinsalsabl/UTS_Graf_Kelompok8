@@ -1,0 +1,2099 @@
+UNWIND [600, 108, 524] AS kom
+
+CALL (kom) {
+    MATCH (m:Movie {louvainCommunity: kom})<-[r:RATED]-()
+    WITH m, count(r) AS jml
+    ORDER BY jml DESC
+    LIMIT 8
+    RETURN collect(m) AS film
+}
+
+CALL (kom) {
+    MATCH (u:User {louvainCommunity: kom})-[r:RATED]->()
+    WITH u, count(r) AS jml
+    ORDER BY jml DESC
+    LIMIT 8
+    RETURN collect(u) AS pengguna
+}
+
+UNWIND pengguna AS u
+UNWIND film AS m
+
+MATCH (u)-[r:RATED]->(m)
+WHERE r.rating >= 4
+
+RETURN u, r, m;
+
+MATCH (n)
+WHERE n.louvainCommunity IS NOT NULL
+RETURN labels(n) AS Jenis_Node,
+       n.louvainCommunity AS Komunitas,
+       count(n) AS Jumlah
+ORDER BY Komunitas;
+
+CALL () {
+  MATCH (n:User) WHERE n.leidenCommunity IS NOT NULL
+  WITH n.leidenCommunity AS kom, count(*) AS ukuran
+  ORDER BY ukuran DESC LIMIT 3
+  RETURN collect(kom) AS top3
+}
+UNWIND top3 AS kom
+CALL (kom) {
+  MATCH (m:Movie {leidenCommunity: kom})<-[r:RATED]-()
+  WITH m, count(r) AS jml
+  ORDER BY jml DESC LIMIT 8
+  RETURN collect(m) AS film
+}
+CALL (kom) {
+  MATCH (u:User {leidenCommunity: kom})-[r:RATED]->()
+  WITH u, count(r) AS jml
+  ORDER BY jml DESC LIMIT 8
+  RETURN collect(u) AS pengguna
+}
+UNWIND pengguna AS u
+UNWIND film AS m
+MATCH (u)-[r:RATED]->(m)
+WHERE r.rating >= 4
+RETURN u, r, m;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.louvainCommunity IN [600, 108, 524, 377, 471, 445, 137]
+  AND m.louvainCommunity IN [600, 108, 524, 377, 471, 445, 137]
+RETURN u.louvainCommunity AS komunitas_user,
+       m.louvainCommunity AS komunitas_film,
+       count(r) AS jumlah_rating
+ORDER BY jumlah_rating DESC;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.louvainCommunity IN [600, 108, 524]
+  AND m.louvainCommunity = u.louvainCommunity
+  AND r.rating >= 4.5
+WITH u, m, r, rand() AS acak
+ORDER BY acak
+LIMIT 120
+RETURN u, r, m;
+
+UNWIND [600, 108, 524] AS kom
+CALL (kom) {
+  MATCH (m:Movie {louvainCommunity: kom})<-[r:RATED]-()
+  WITH m, count(r) AS jml
+  ORDER BY jml DESC LIMIT 8
+  RETURN collect(m) AS film
+}
+CALL (kom) {
+  MATCH (u:User {louvainCommunity: kom})-[r:RATED]->()
+  WITH u, count(r) AS jml
+  ORDER BY jml DESC LIMIT 8
+  RETURN collect(u) AS pengguna
+}
+UNWIND pengguna AS u
+UNWIND film AS m
+MATCH (u)-[r:RATED]->(m)
+WHERE r.rating >= 4
+RETURN u, r, m;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+RETURN
+  gds.util.asNode(nodeId).title AS judulFilm,
+  communityId
+LIMIT 100;
+
+CALL gds.louvain.write(
+  'movieLouvainGraph',
+  {writeProperty: 'communityId'}
+)
+YIELD communityCount, modularity, modularities, nodePropertiesWritten
+RETURN communityCount, modularity, modularities, nodePropertiesWritten;
+
+MATCH (n)
+WHERE n.communityId IS NOT NULL
+RETURN
+  n.communityId AS komunitas,
+  count(n) AS jumlahAnggota,
+  collect(
+    coalesce(n.title, n.name, toString(id(n)))
+  ) AS anggota
+ORDER BY jumlahAnggota DESC;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN
+  labels(n) AS labelNode,
+  coalesce(n.title, n.name, toString(id(n))) AS namaNode,
+  communityId
+ORDER BY communityId, labelNode, namaNode;
+
+MATCH (u:user)-[r:SIMILIAR]-(v:user)
+WHERE u.userId < v.userId
+RETURN u, r, v
+LIMIT 100;
+
+MATCH (u:User)-[r:Rated]-(m:Movie)
+RETURN u, r, m
+LIMIT 10;
+
+MATCH (u:user)-[r:Rated]-(m:movie)
+RETURN u, r, m
+LIMIT 100;
+
+CALL gds.louvain.write('movieLouvainGraph', {
+    writeProperty: 'communityId'
+})
+YIELD communityCount, modularity, nodePropertiesWritten
+RETURN
+    communityCount AS jumlahKomunitas,
+    modularity AS modularity,
+    nodePropertiesWritten AS nodeTersimpan;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN
+    communityId,
+    count(*) AS totalNode,
+    count(CASE WHEN 'user' IN labels(n) THEN 1 END)
+        AS jumlahUser,
+    count(CASE WHEN 'movie' IN labels(n) THEN 1 END)
+        AS jumlahMovie
+ORDER BY totalNode DESC;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN
+    labels(n) AS nodeType,
+    coalesce(
+        toString(n.userId),
+        toString(n.movieId),
+        n.title
+    ) AS node,
+    communityId
+ORDER BY communityId, node;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN
+    communityId,
+    count(*) AS totalNode,
+    count(CASE WHEN 'user' IN labels(n) THEN 1 END)
+        AS jumlahUser,
+    count(CASE WHEN 'movie' IN labels(n) THEN 1 END)
+        AS jumlahMovie
+ORDER BY totalNode DESC;
+
+CALL gds.louvain.stats('movieLouvainGraph')
+YIELD communityCount, modularity
+RETURN
+    communityCount AS jumlahKomunitas,
+    modularity AS nilaiModularity;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+  RETURN v.userId AS user, v.louvainCommunity AS komunitas, round(s.score, 3) AS skor
+  ORDER BY s.score DESC;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+WITH rec, sum(s.score * r.rating) / sum(s.score) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 3
+RETURN rec.title AS film, rec.louvainCommunity AS komunitas_film,
+       round(prediksi, 2) AS prediksi, pendukung
+ORDER BY prediksi DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1}) RETURN u.louvainCommunity AS komunitas_user1;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+WITH u, s, v
+ORDER BY s.score DESC
+LIMIT 8
+CALL (u, v) {
+  MATCH (v)-[r:RATED]->(rec:Movie)
+  WHERE NOT (u)-[:RATED]->(rec) AND r.rating >= 4.5
+  RETURN r, rec
+  ORDER BY r.rating DESC, rec.title
+  LIMIT 3
+}
+RETURN u, s, v, r, rec;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+WITH u, s, v
+ORDER BY s.score DESC
+LIMIT 8
+CALL (u, v) {
+  MATCH (v)-[r:RATED]->(rec:Movie)
+  WHERE NOT (u)-[:RATED]->(rec) AND r.rating >= 4.5
+  RETURN r, rec
+  ORDER BY r.rating DESC, rec.title
+  LIMIT 3
+}
+RETURN u, s, v, r, rec;
+
+CALL gds.graph.project(
+    'movieLouvainGraph',
+    ['User', 'Movie'],
+    {
+        RATED: {
+            orientation: 'UNDIRECTED'
+        }
+    }
+)
+YIELD graphName, nodeCount, relationshipCount
+RETURN graphName, nodeCount, relationshipCount;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+SET n.communityId = communityId;
+
+MATCH (u:User {userId: 1})-[:SIMILAR]->(v:User)
+RETURN v.louvainCommunity AS komunitas_tetangga, count(*) AS jumlah
+ORDER BY jumlah DESC;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+WITH u, s, v
+ORDER BY s.score DESC
+LIMIT 6
+CALL (u, v) {
+  MATCH (v)-[r:RATED]->(rec:Movie)
+  WHERE NOT (u)-[:RATED]->(rec) AND r.rating >= 4.5
+  RETURN r, rec
+  ORDER BY r.rating DESC, rec.title
+  LIMIT 5
+}
+RETURN u, s, v, r, rec;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.leidenCommunity IN [/* 3 ID teratas */]
+  AND m.leidenCommunity = u.leidenCommunity
+  AND r.rating >= 4.5
+WITH u, m, r, rand() AS acak
+ORDER BY acak
+LIMIT 120
+RETURN u, r, m;
+
+MATCH (n) WHERE n.leidenCommunity IS NOT NULL
+RETURN n.leidenCommunity AS komunitas, count(*) AS ukuran
+ORDER BY ukuran DESC LIMIT 3;
+
+MATCH (n) WHERE n.leidenCommunity IS NOT NULL
+RETURN n.leidenCommunity AS komunitas, count(*) AS ukuran
+ORDER BY ukuran DESC LIMIT 3;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.louvainCommunity IN [600, 108, 524]
+  AND m.louvainCommunity = u.louvainCommunity
+  AND r.rating >= 4.5
+WITH u, m, r, rand() AS acak
+ORDER BY acak
+LIMIT 120
+RETURN u, r, m;
+
+CALL gds.graph.drop('cfGraph', false);
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+  AND v.louvainCommunity = u.louvainCommunity
+WITH rec, sum(s.score * r.rating) / sum(s.score) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 2
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+WITH rec, sum(s.score * r.rating) / sum(s.score) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 3
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+RETURN count(v) AS jumlah_tetangga,
+       round(min(s.score), 3) AS skor_min,
+       round(max(s.score), 3) AS skor_maks;
+
+CALL gds.nodeSimilarity.write('cfGraph', {
+  similarityMetric: 'COSINE',
+  relationshipWeightProperty: 'rating',
+  topK: 20,
+  similarityCutoff: 0.15,
+  writeRelationshipType: 'SIMILAR',
+  writeProperty: 'score'
+})
+YIELD nodesCompared, relationshipsWritten
+RETURN nodesCompared, relationshipsWritten;
+
+CALL gds.graph.project(
+  'cfGraph',
+  ['User', 'Movie'],
+  { RATED: { orientation: 'NATURAL', properties: 'rating' } }
+);
+
+MATCH ()-[s:SIMILAR]->() DELETE s;
+
+CALL gds.leiden.stats('movieGraph', {
+  relationshipWeightProperty: 'rating',
+  randomSeed: 42
+})
+YIELD communityCount, modularity, ranLevels
+RETURN 'Leiden' AS metode, communityCount, modularity, ranLevels;
+
+CALL gds.graph.project(
+  'movieGraph',
+  ['User', 'Movie'],
+  { RATED: { orientation: 'UNDIRECTED', properties: 'rating' } }
+);
+
+MATCH (u:User {userId: 1})-[r1:RATED]->(m:Movie)<-[r2:RATED]-(v:User)
+WHERE u <> v
+WITH v, count(m) AS film_sama,
+     sum(r1.rating * r2.rating) AS dot,
+     sqrt(sum(r1.rating ^ 2)) AS n1,
+     sqrt(sum(r2.rating ^ 2)) AS n2
+WHERE film_sama >= 5
+RETURN v.userId AS user_mirip, film_sama, round(dot / (n1 * n2), 4) AS kemiripan
+ORDER BY kemiripan DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+WITH rec, sum(s.score * r.rating) / sum(s.score) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 3
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[r1:RATED]->(m:Movie)<-[r2:RATED]-(v:User)
+WHERE u <> v AND v.louvainCommunity = u.louvainCommunity
+WITH u, v, count(m) AS film_sama,
+     sum(r1.rating * r2.rating) AS dot,
+     sqrt(sum(r1.rating ^ 2)) AS n1,
+     sqrt(sum(r2.rating ^ 2)) AS n2
+WHERE film_sama >= 5
+WITH u, v, dot / (n1 * n2) AS sim
+ORDER BY sim DESC
+LIMIT 30
+MATCH (v)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+WITH rec, sum(sim * r.rating) / sum(sim) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 3
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+RETURN v.userId AS user_mirip, v.louvainCommunity AS komunitas, round(s.score, 4) AS kemiripan
+ORDER BY s.score DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+WITH rec, sum(s.score * r.rating) / sum(s.score) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 3
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+  AND v.louvainCommunity = u.louvainCommunity
+WITH rec, sum(s.score * r.rating) / sum(s.score) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 2
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+CALL gds.graph.drop('cfGraph', false);
+   CALL gds.graph.drop('movieGraph', false);
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+WITH u, s, v
+ORDER BY s.score DESC
+LIMIT 5
+MATCH (v)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec) AND r.rating >= 4.5
+RETURN u, s, v, r, rec
+LIMIT 60;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+WITH u, s, v
+ORDER BY s.score DESC
+LIMIT 5
+MATCH (v)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec) AND r.rating >= 4.5
+RETURN u, s, v, r, rec
+LIMIT 60;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+WITH u, s, v
+ORDER BY s.score DESC
+LIMIT 5
+MATCH (v)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec) AND r.rating >= 4.5
+RETURN u, s, v, r, rec
+LIMIT 60;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+WITH u, s, v
+ORDER BY s.score DESC
+LIMIT 5
+MATCH (v)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec) AND r.rating >= 4.5
+RETURN u, s, v, r, rec
+LIMIT 60;
+
+CALL gds.graph.drop('cfGraph', false);
+   CALL gds.graph.drop('movieGraph', false);
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+  AND v.louvainCommunity = u.louvainCommunity
+WITH rec, sum(s.score * r.rating) / sum(s.score) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 2
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+WITH rec, sum(s.score * r.rating) / sum(s.score) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 3
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)
+RETURN v.userId AS user_mirip, v.louvainCommunity AS komunitas, round(s.score, 4) AS kemiripan
+ORDER BY s.score DESC
+LIMIT 10;
+
+CALL gds.graph.drop('cfGraph');
+
+MATCH (u:User {userId: 1})-[r1:RATED]->(m:Movie)<-[r2:RATED]-(v:User)
+WHERE u <> v AND v.louvainCommunity = u.louvainCommunity
+WITH u, v, count(m) AS film_sama,
+     sum(r1.rating * r2.rating) AS dot,
+     sqrt(sum(r1.rating ^ 2)) AS n1,
+     sqrt(sum(r2.rating ^ 2)) AS n2
+WHERE film_sama >= 5
+WITH u, v, dot / (n1 * n2) AS sim
+ORDER BY sim DESC
+LIMIT 30
+MATCH (v)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+WITH rec, sum(sim * r.rating) / sum(sim) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 3
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1}) RETURN u.userId, u.louvainCommunity;
+
+MATCH (u:User {userId: 1})-[r1:RATED]->(m:Movie)<-[r2:RATED]-(v:User)
+WHERE u <> v AND v.louvainCommunity = u.louvainCommunity
+WITH u, v, count(m) AS film_sama,
+     sum(r1.rating * r2.rating) AS dot,
+     sqrt(sum(r1.rating ^ 2)) AS n1,
+     sqrt(sum(r2.rating ^ 2)) AS n2
+WHERE film_sama >= 5
+WITH u, v, dot / (n1 * n2) AS sim
+ORDER BY sim DESC
+LIMIT 30
+MATCH (v)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+WITH rec, sum(sim * r.rating) / sum(sim) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 3
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (m1:Movie {title: 'Matrix, The (1999)'})<-[r1:RATED]-(u:User)-[r2:RATED]->(m2:Movie)
+WHERE m1 <> m2
+WITH m2, count(u) AS user_sama,
+     sum(r1.rating * r2.rating) AS dot,
+     sqrt(sum(r1.rating ^ 2)) AS n1,
+     sqrt(sum(r2.rating ^ 2)) AS n2
+WHERE user_sama >= 20
+RETURN m2.title AS film_mirip, user_sama, round(dot / (n1 * n2), 3) AS kemiripan
+ORDER BY kemiripan DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[s:SIMILAR]->(v:User)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+WITH rec, sum(s.score * r.rating) / sum(s.score) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 3
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+CALL gds.nodeSimilarity.write('cfGraph', {
+  similarityMetric: 'COSINE',
+  relationshipWeightProperty: 'rating',
+  topK: 20,
+  similarityCutoff: 0.1,
+  writeRelationshipType: 'SIMILAR',
+  writeProperty: 'score'
+})
+YIELD nodesCompared, relationshipsWritten
+RETURN nodesCompared, relationshipsWritten;
+
+CALL gds.graph.project(
+  'cfGraph',
+  ['User', 'Movie'],
+  { RATED: { orientation: 'NATURAL', properties: 'rating' } }
+);
+
+MATCH (u:User {userId: 1})-[r1:RATED]->(m:Movie)<-[r2:RATED]-(v:User)
+WHERE u <> v
+WITH u, v, count(m) AS film_sama,
+     sum(r1.rating * r2.rating) AS dot,
+     sqrt(sum(r1.rating ^ 2)) AS n1,
+     sqrt(sum(r2.rating ^ 2)) AS n2
+WHERE film_sama >= 5
+WITH u, v, dot / (n1 * n2) AS sim
+ORDER BY sim DESC
+LIMIT 30
+MATCH (v)-[r:RATED]->(rec:Movie)
+WHERE NOT (u)-[:RATED]->(rec)
+WITH rec, sum(sim * r.rating) / sum(sim) AS prediksi, count(v) AS pendukung
+WHERE pendukung >= 3
+RETURN rec.title AS rekomendasi,
+       round(prediksi, 2) AS prediksi_rating,
+       pendukung AS jumlah_user_pendukung
+ORDER BY prediksi_rating DESC, pendukung DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[r1:RATED]->(m:Movie)<-[r2:RATED]-(v:User)
+WHERE u <> v
+WITH v, count(m) AS film_sama,
+     sum(r1.rating * r2.rating) AS dot,
+     sqrt(sum(r1.rating ^ 2)) AS n1,
+     sqrt(sum(r2.rating ^ 2)) AS n2
+WHERE film_sama >= 5
+RETURN v.userId AS user_mirip, film_sama, round(dot / (n1 * n2), 4) AS kemiripan
+ORDER BY kemiripan DESC
+LIMIT 10;
+
+MATCH (u:User {userId: 1})-[r:RATED]->(m:Movie)
+RETURN count(r) AS jumlah_dirating;
+
+MATCH (u:User {userId: 1})-[r:RATED]->(m:Movie)
+RETURN m.title AS film, r.rating AS rating
+ORDER BY r.rating DESC
+LIMIT 10;
+
+CALL gds.graph.drop('movieGraph');
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.leidenCommunity = m.leidenCommunity
+  AND r.rating = 5.0
+WITH u, r, m, rand() AS acak
+ORDER BY acak
+LIMIT 30
+RETURN u, r, m;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.leidenCommunity = m.leidenCommunity
+  AND r.rating = 5.0
+WITH u, r, m, rand() AS acak
+ORDER BY acak
+LIMIT 300
+RETURN u, r, m;
+
+MATCH (n)
+WHERE n.louvainCommunity IS NOT NULL AND n.leidenCommunity IS NOT NULL
+RETURN n.louvainCommunity AS louvain, n.leidenCommunity AS leiden, count(*) AS jumlah
+ORDER BY jumlah DESC
+LIMIT 20;
+
+MATCH (n)
+WHERE n.leidenCommunity IS NOT NULL
+WITH n.leidenCommunity AS komunitas, count(*) AS ukuran
+ORDER BY ukuran DESC LIMIT 7
+WITH collect(komunitas) AS top
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE m.leidenCommunity IN top
+WITH m.leidenCommunity AS komunitas, m.title AS film,
+     count(r) AS jumlah_rating, round(avg(r.rating), 2) AS rata2
+ORDER BY komunitas, jumlah_rating DESC
+WITH komunitas, collect(film + ' (' + jumlah_rating + ' rating, rata2 ' + rata2 + ')')[0..5] AS top5_film
+RETURN komunitas, top5_film
+ORDER BY komunitas;
+
+MATCH (n)
+WHERE n.leidenCommunity IS NOT NULL
+WITH n.leidenCommunity AS komunitas, count(*) AS ukuran
+ORDER BY ukuran DESC LIMIT 7
+WITH collect(komunitas) AS top
+MATCH (m:Movie)
+WHERE m.leidenCommunity IN top
+WITH m.leidenCommunity AS komunitas, count(*) AS total_film, collect(m) AS films
+UNWIND films AS f
+UNWIND split(f.genres, '|') AS genre
+WITH komunitas, total_film, genre, count(*) AS jumlah
+ORDER BY komunitas, jumlah DESC
+WITH komunitas, total_film,
+     collect(genre + ' ' + toString(toInteger(round(100.0 * jumlah / total_film))) + '%')[0..3] AS top3_persen
+RETURN komunitas, total_film, top3_persen
+ORDER BY total_film DESC;
+
+MATCH (n)
+WHERE n.leidenCommunity IS NOT NULL
+RETURN n.leidenCommunity AS komunitas,
+       count(CASE WHEN n:User THEN 1 END)  AS jumlah_user,
+       count(CASE WHEN n:Movie THEN 1 END) AS jumlah_film
+ORDER BY jumlah_user + jumlah_film DESC
+LIMIT 10;
+
+CALL gds.leiden.write('movieGraph', {
+  relationshipWeightProperty: 'rating',
+  writeProperty: 'leidenCommunity',
+  randomSeed: 42
+})
+YIELD communityCount, modularity, ranLevels, nodePropertiesWritten
+RETURN communityCount, modularity, ranLevels, nodePropertiesWritten;
+
+CALL gds.graph.list('movieGraph')
+YIELD graphName, nodeCount, relationshipCount
+RETURN graphName, nodeCount, relationshipCount;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.louvainCommunity IN [600, 108, 524]
+  AND m.louvainCommunity = u.louvainCommunity
+  AND r.rating = 5.0
+WITH u, r, m, rand() AS acak
+ORDER BY acak
+LIMIT 30
+RETURN u, r, m;
+
+MATCH (n) WHERE n.louvainCommunity = 600 SET n:Komunitas600;
+MATCH (n) WHERE n.louvainCommunity = 108 SET n:Komunitas108;
+MATCH (n) WHERE n.louvainCommunity = 524 SET n:Komunitas524;
+
+MATCH (n)
+WHERE n.louvainCommunity IN [600, 108, 524, 377, 471, 445, 137]
+SET n:$("Komunitas" + toString(n.louvainCommunity));
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.louvainCommunity IN [600, 108, 524]
+  AND m.louvainCommunity = u.louvainCommunity
+  AND r.rating = 5.0
+WITH u, r, m, rand() AS acak
+ORDER BY acak
+LIMIT 300
+RETURN u, r, m;
+
+MATCH (m:Movie)
+WHERE m.louvainCommunity IN [600, 108, 377, 524, 471, 445, 137]
+WITH m.louvainCommunity AS komunitas, count(*) AS total_film, collect(m) AS films
+UNWIND films AS f
+UNWIND split(f.genres, '|') AS genre
+WITH komunitas, total_film, genre, count(*) AS jumlah
+ORDER BY komunitas, jumlah DESC
+WITH komunitas, total_film,
+     collect(genre + ' ' + toString(toInteger(round(100.0 * jumlah / total_film))) + '%')[0..3] AS top3_persen
+RETURN komunitas, total_film, top3_persen
+ORDER BY total_film DESC;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE m.louvainCommunity IN [600, 108, 377, 524, 471, 445, 137]
+WITH m.louvainCommunity AS komunitas, m.title AS film,
+     count(r) AS jumlah_rating, round(avg(r.rating), 2) AS rata2
+ORDER BY komunitas, jumlah_rating DESC
+WITH komunitas, collect(film + ' (' + jumlah_rating + ' rating, rata2 ' + rata2 + ')')[0..5] AS top5_film
+RETURN komunitas, top5_film
+ORDER BY komunitas;
+
+MATCH (m:Movie) WHERE NOT (m)<-[:RATED]-()
+RETURN count(m) AS film_tanpa_rating;
+
+MATCH (u:User)-[r:RATED]->(m:Movie {louvainCommunity: 0})
+RETURN m.title AS film, count(r) AS jumlah_rating, round(avg(r.rating), 2) AS rata2
+ORDER BY jumlah_rating DESC
+LIMIT 5;
+
+MATCH (u:User)-[r:RATED]->(m:Movie {louvainCommunity: 0})
+RETURN m.title AS film, count(r) AS jumlah_rating, round(avg(r.rating), 2) AS rata2
+ORDER BY jumlah_rating DESC
+LIMIT 10;
+
+MATCH (m:Movie)
+WHERE m.louvainCommunity IS NOT NULL
+UNWIND split(m.genres, '|') AS genre
+WITH m.louvainCommunity AS komunitas, genre, count(*) AS jumlah
+ORDER BY komunitas, jumlah DESC
+WITH komunitas, collect(genre + ' (' + jumlah + ')')[0..3] AS top3_genre
+RETURN komunitas, top3_genre
+ORDER BY komunitas;
+
+MATCH (n)
+WHERE n.louvainCommunity IS NOT NULL
+RETURN n.louvainCommunity AS komunitas,
+       count(CASE WHEN n:User THEN 1 END)  AS jumlah_user,
+       count(CASE WHEN n:Movie THEN 1 END) AS jumlah_film
+ORDER BY jumlah_user + jumlah_film DESC
+LIMIT 10;
+
+CALL gds.louvain.write('movieGraph', {
+  relationshipWeightProperty: 'rating',
+  writeProperty: 'louvainCommunity'
+})
+YIELD communityCount, modularity, ranLevels, nodePropertiesWritten
+RETURN communityCount, modularity, ranLevels, nodePropertiesWritten;
+
+CALL gds.graph.project(
+  'movieGraph',
+  ['User', 'Movie'],
+  { RATED: { orientation: 'UNDIRECTED', properties: 'rating' } }
+)
+YIELD graphName, nodeCount, relationshipCount
+RETURN graphName, nodeCount, relationshipCount;
+
+CALL gds.graph.drop('movieGraph');
+
+MATCH (n) RETURN labels(n) AS label, count(*) AS jumlah;
+MATCH ()-[r:RATED]->() RETURN count(r) AS jumlah_rating;
+
+CALL gds.graph.list('movieGraph')
+YIELD graphName, database, nodeCount, relationshipCount
+RETURN graphName, database, nodeCount, relationshipCount;
+
+CALL gds.louvain.write('movieGraph', {
+  relationshipWeightProperty: 'rating',
+  writeProperty: 'louvainCommunity'
+})
+YIELD communityCount, modularity, ranLevels, nodePropertiesWritten
+RETURN communityCount, modularity, ranLevels, nodePropertiesWritten;
+
+CALL gds.graph.project(
+  'movieGraph',
+  ['User', 'Movie'],
+  { RATED: { orientation: 'UNDIRECTED', properties: 'rating' } }
+);
+
+RETURN gds.version();
+
+MATCH (n) RETURN labels(n) AS label, count(*) AS jumlah;
+MATCH ()-[r:RATED]->() RETURN count(r) AS jumlah_rating;
+
+MATCH (n:User) RETURN n LIMIT 25;
+
+MATCH (u:User)-[r:RATED]->(m:Movie) RETURN u, r, m LIMIT 25;
+MATCH (u:User) RETURN u LIMIT 3;
+
+MATCH (n) DETACH DELETE n;
+
+MATCH (n) 
+WHERE n.genres IS NOT NULL
+RETURN DISTINCT "node" as entity, n.genres AS genres LIMIT 25
+UNION ALL 
+MATCH ()-[r]-() 
+WHERE r.genres IS NOT NULL
+RETURN DISTINCT "relationship" AS entity, r.genres AS genres LIMIT 25;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId = 473
+  AND m.communityId = 473
+RETURN u, r, m
+LIMIT 100;
+
+MATCH (n)
+WHERE n.communityId = 473
+RETURN labels(n) AS JenisNode,
+       count(n) AS JumlahNode;
+
+MATCH (n)
+WHERE n.communityId IS NOT NULL
+RETURN n.communityId AS Komunitas,
+       count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 10;
+
+MATCH (u)-[r]-(m)
+WHERE u.communityId = 473
+  AND m.communityId = 473
+RETURN u, r, m
+LIMIT 100;
+
+MATCH (n)
+WHERE n.communityId = 473
+RETURN n
+LIMIT 50;
+
+MATCH (n)
+WHERE n.communityId = 473
+RETURN n
+LIMIT 50;
+
+MATCH (n)
+WHERE n.communityId = 473
+RETURN labels(n) AS Label, count(n) AS JumlahNode;
+
+MATCH (n:Community609) RETURN n LIMIT 25;
+
+MATCH (n:Community473) RETURN n LIMIT 25;
+
+MATCH (n:Community802) RETURN n LIMIT 25;
+
+MATCH (n:Community317) RETURN n LIMIT 25;
+
+MATCH (n:Community609) RETURN n LIMIT 25;
+
+MATCH (n)
+WHERE n.communityId = 181
+RETURN n
+LIMIT 100;
+
+MATCH (n:Community181) RETURN n LIMIT 25;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+
+FOREACH (_ IN CASE WHEN n.communityId = 609 THEN [1] ELSE [] END |
+    SET n:Community609
+)
+FOREACH (_ IN CASE WHEN n.communityId = 473 THEN [1] ELSE [] END |
+    SET n:Community473
+)
+FOREACH (_ IN CASE WHEN n.communityId = 181 THEN [1] ELSE [] END |
+    SET n:Community181
+)
+FOREACH (_ IN CASE WHEN n.communityId = 317 THEN [1] ELSE [] END |
+    SET n:Community317
+)
+FOREACH (_ IN CASE WHEN n.communityId = 802 THEN [1] ELSE [] END |
+    SET n:Community802
+)
+
+RETURN count(n) AS JumlahNodeDiproses;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId = m.communityId
+  AND u.communityId IN [609, 473, 181, 317, 802]
+
+WITH u.communityId AS komunitas, u, r, m
+ORDER BY rand()
+
+WITH komunitas,
+     collect({
+         pengguna: u,
+         relasi: r,
+         film: m
+     })[0..40] AS sampel
+
+UNWIND sampel AS x
+
+RETURN x.pengguna AS User,
+       x.relasi AS RATED,
+       x.film AS Movie;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId = m.communityId
+  AND u.communityId IN [609, 473, 181, 317, 802]
+
+WITH u.communityId AS komunitas,
+     collect({pengguna: u, relasi: r, film: m})[0..40] AS sampel
+
+UNWIND sampel AS x
+
+RETURN x.pengguna AS User,
+       x.relasi AS RATED,
+       x.film AS Movie;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId = m.communityId
+  AND u.communityId IN [609, 473, 181, 317, 802]
+RETURN
+    u.communityId AS Komunitas,
+    count(r) AS JumlahRelasi
+ORDER BY JumlahRelasi DESC;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 20;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+RETURN
+    labels(n) AS JenisNode,
+    keys(n) AS Properti
+LIMIT 10;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+RETURN
+    labels(n) AS JenisNode,
+    keys(n) AS Properti
+LIMIT 10;
+
+MATCH (n:User)
+RETURN n
+LIMIT 5;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 20;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId IN [181, 473, 593, 609]
+   OR m.communityId IN [181, 473, 593, 609]
+RETURN DISTINCT u, r, m
+LIMIT 300;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IN [609, 473, 181, 593]
+RETURN
+    n.communityId AS Komunitas,
+    labels(n)[0] AS JenisNode,
+    count(n) AS JumlahNode
+ORDER BY Komunitas, JenisNode;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId IN [609, 473, 181, 593]
+  AND m.communityId IN [609, 473, 181, 593]
+RETURN u, r, m
+LIMIT 300;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahAnggota,
+    count(CASE WHEN n:User THEN 1 END) AS JumlahUser,
+    count(CASE WHEN n:Movie THEN 1 END) AS JumlahMovie
+ORDER BY JumlahAnggota DESC
+LIMIT 20;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WITH u, r, m
+ORDER BY rand()
+LIMIT 100
+RETURN u, r, m;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 20;
+
+CALL gds.louvain.write(
+    'movieLouvainGraph',
+    {
+        writeProperty: 'communityId'
+    }
+)
+YIELD communityCount, modularity
+RETURN communityCount, modularity;
+
+CALL gds.louvain.write(
+    'movieLouvainGraph',
+    {
+        writeProperty: 'communityId'
+    }
+)
+YIELD communityCount, modularity
+RETURN communityCount, modularity;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 20;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 20;
+
+CALL gds.louvain.write(
+    'movieLouvainGraph',
+    {
+        writeProperty: 'communityId'
+    }
+)
+YIELD communityCount, modularity
+RETURN communityCount, modularity;
+
+MATCH (n)
+WHERE n:User OR n:Movie
+RETURN
+    labels(n) AS JenisNode,
+    keys(n) AS DaftarProperti
+LIMIT 10;
+
+CALL gds.graph.project(
+    'movieLouvainGraph',
+    ['User', 'Movie'],
+    {
+        RATED: {
+            orientation: 'UNDIRECTED'
+        }
+    }
+)
+YIELD graphName, nodeCount, relationshipCount
+RETURN graphName, nodeCount, relationshipCount;
+
+CALL gds.graph.project(
+    'movieLouvainGraph',
+    ['User', 'Movie'],
+    {
+        RATED: {
+            orientation: 'UNDIRECTED'
+        }
+    }
+)
+YIELD graphName, nodeCount, relationshipCount
+RETURN graphName, nodeCount, relationshipCount;
+
+MATCH (n)
+WHERE n:User OR n:Movie
+RETURN
+    labels(n) AS JenisNode,
+    keys(n) AS DaftarProperti
+LIMIT 10;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 20;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId IN [181, 473, 593, 609]
+   OR m.communityId IN [181, 473, 593, 609]
+RETURN DISTINCT u, r, m
+LIMIT 300;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 20;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 20;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 20;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahNode
+ORDER BY JumlahNode DESC
+LIMIT 20;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId = 609
+  AND m.communityId = 609
+RETURN u, r, m
+LIMIT 100;
+
+MATCH (n)
+WHERE n:User OR n:Movie
+RETURN labels(n) AS JenisNode, keys(n) AS Properti
+LIMIT 5;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId IN [181, 473, 593, 609]
+   OR m.communityId IN [181, 473, 593, 609]
+RETURN DISTINCT u, r, m
+LIMIT 300;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId = m.communityId
+  AND u.communityId IN [181, 473, 593, 609]
+
+WITH u.communityId AS komunitas, u, r, m
+ORDER BY rand()
+
+WITH komunitas, collect({
+    pengguna: u,
+    relasi: r,
+    film: m
+})[0..75] AS sampel
+
+UNWIND sampel AS x
+
+RETURN
+    x.pengguna AS User,
+    x.relasi AS RATED,
+    x.film AS Movie;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId = 609
+  AND m.communityId = 609
+RETURN u, r, m
+LIMIT 100;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId = 609
+  AND m.communityId = 609
+RETURN u, r, m
+LIMIT 10;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId = 609
+  AND m.communityId = 609
+RETURN u, r, m
+LIMIT 100;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId = m.communityId
+  AND u.communityId IN [181, 473, 593, 609]
+
+WITH u.communityId AS komunitas, u, r, m
+ORDER BY rand()
+
+WITH komunitas, collect({
+    pengguna: u,
+    relasi: r,
+    film: m
+})[0..75] AS sampel
+
+UNWIND sampel AS x
+
+RETURN
+    x.pengguna AS User,
+    x.relasi AS RATED,
+    x.film AS Movie;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId IN [181, 473, 593, 609]
+   OR m.communityId IN [181, 473, 593, 609]
+RETURN DISTINCT u, r, m
+LIMIT 300;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IN [609, 473, 181, 593]
+RETURN
+    n.communityId AS Komunitas,
+    labels(n)[0] AS JenisNode,
+    count(n) AS JumlahNode
+ORDER BY Komunitas, JenisNode;
+
+CALL gds.louvain.stats('movieLouvainGraph')
+YIELD communityCount, modularity, ranLevels
+RETURN communityCount, modularity, ranLevels;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId IN [609, 473, 181, 593]
+  AND m.communityId IN [609, 473, 181, 593]
+RETURN u, r, m
+LIMIT 300;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Komunitas,
+    count(n) AS JumlahAnggota,
+    count(CASE WHEN n:User THEN 1 END) AS JumlahUser,
+    count(CASE WHEN n:Movie THEN 1 END) AS JumlahMovie
+ORDER BY JumlahAnggota DESC
+LIMIT 20;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WITH u, r, m
+ORDER BY rand()
+LIMIT 100
+RETURN u, r, m;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN u, r, m
+LIMIT 100;
+
+MATCH (n)
+WHERE (n:User OR n:Movie)
+  AND n.communityId IS NOT NULL
+RETURN
+    n.communityId AS Community,
+    count(n) AS JumlahAnggota,
+    count(CASE WHEN n:User THEN 1 END) AS JumlahUser,
+    count(CASE WHEN n:Movie THEN 1 END) AS JumlahMovie
+ORDER BY JumlahAnggota DESC
+LIMIT 20;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE u.communityId IS NOT NULL
+  AND m.communityId IS NOT NULL
+RETURN u, r, m
+LIMIT 300;
+
+MATCH (u:User {communityId: 593})-[r:RATED]->(m:Movie)
+WHERE m.communityId = 593
+WITH u, collect({rel: r, movie: m}) AS items
+WHERE size(items) > 0
+WITH u, items
+ORDER BY size(items) DESC
+LIMIT 1
+UNWIND items[0..8] AS item
+RETURN u, item.rel AS r, item.movie AS m;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN u, r, m
+LIMIT 50;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+SET n.communityId = communityId;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN u, r, m
+LIMIT 50;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+WHERE communityId = 609
+RETURN n, communityId
+LIMIT 100;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN n, communityId
+LIMIT 100;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN n, communityId
+LIMIT 100;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH communityId, gds.util.asNode(nodeId) AS n
+RETURN
+    communityId AS Komunitas,
+    count(*) AS JumlahAnggota,
+    count(CASE WHEN n:User THEN 1 END) AS JumlahUser,
+    count(CASE WHEN n:Movie THEN 1 END) AS JumlahMovie
+ORDER BY JumlahAnggota DESC
+LIMIT 20;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN n, communityId
+LIMIT 100;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH communityId, gds.util.asNode(nodeId) AS n
+RETURN
+    communityId AS komunitas,
+    count(*) AS jumlahAnggota,
+    count(CASE WHEN n:User THEN 1 END) AS jumlahUser,
+    count(CASE WHEN n:Movie THEN 1 END) AS jumlahMovie
+ORDER BY jumlahAnggota DESC
+LIMIT 20;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN
+    communityId AS komunitas,
+    labels(n)[0] AS tipeNode,
+    CASE
+        WHEN n:User THEN toString(n.userId)
+        WHEN n:Movie THEN toString(n.movieId)
+    END AS idNode,
+    CASE
+        WHEN n:Movie THEN n.title
+        ELSE null
+    END AS judulFilm
+ORDER BY komunitas, tipeNode
+LIMIT 50;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN
+    labels(n) AS tipeNode,
+    n.userId AS userId,
+    n.movieId AS movieId,
+    n.title AS judulFilm,
+    communityId AS komunitas
+ORDER BY komunitas
+LIMIT 50;
+
+CALL gds.graph.project(
+    'movieLouvainGraph',
+    ['User', 'Movie'],
+    {
+        RATED: {
+            orientation: 'UNDIRECTED'
+        }
+    }
+)
+YIELD graphName, nodeCount, relationshipCount
+RETURN graphName, nodeCount, relationshipCount;
+
+RETURN gds.version() AS versiGDS;
+
+MATCH ()-[r]->()
+RETURN type(r) AS jenisRelasi, count(r) AS jumlahRelasi;
+
+MATCH (n)
+RETURN labels(n) AS label, count(n) AS jumlahNode;
+
+MATCH ()-[r]->()
+RETURN type(r) AS jenisRelasi, count(r) AS jumlahRelasi;
+
+MATCH (n)
+RETURN labels(n) AS label, count(n) AS jumlahNode;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN u, r, m
+LIMIT 10;
+
+MATCH(n)DETACH DELETE n;
+
+MATCH (m:Movie) WITH m.actors as actors UNWIND actors as actor MATCH (n:Movie) WHERE actor IN n.actors WITH actor, n.actors as otherActors, n.title as title UNWIND otherActors as otherActor WITH actor, otherActor, title WHERE actor <> otherActor RETURN actor, otherActor, title ORDER BY actor;
+
+MATCH (m:Movie) WHERE m.director = 'Quentin Tarantino' RETURN m;
+
+CREATE(p:Movie { title: 'PulpFiction', actors:['JohnTravolta','SamuelJackson','BruceWillis', 'UmaThurman'], director: 'QuentinTarantino', genres:['Action', 'Crime', 'Thriller'], writers: ['QuentinTarantino','RogerAvary'], year: 1994 }) CREATE(t:Movie { title: 'ThePunisher', actors:['ThomasJane', 'John Travolta', 'SamanthaMathis'], director: 'JonathanHensleigh', genres:['Action', 'Adventure', 'Crime', 'Drama', 'Thriller'], writers: ['JonathanHensleigh', 'MichaelFrance'], year: 2004 }) CREATE(k:Movie { title: 'KillBill:Volume1', actors:['UmaThurman', 'Lucy Liu', 'VivicaA.Fox'], director: 'QuentinTarantino', genres:['Action', 'Crime', 'Thriller'], writers: ['QuentinTarantino','UmaThurman'], year: 2003 });
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN properties(r) AS properti_relasi,
+       properties(m) AS properti_film
+LIMIT 5;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN properties(r) AS properti_rating
+LIMIT 5;
+
+MATCH (u:user)
+RETURN labels(u) AS label, properties(u) AS properti
+LIMIT 10;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN
+    u.userId AS userId,
+    m.title AS judul_film,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN
+    u.userId AS userId,
+    m.title AS judul_film,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH ()-[r:Rated]->()
+RETURN count(r) AS jumlah_rating;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN u, r, m
+LIMIT 10;
+
+MATCH ()-[r]->()
+RETURN type(r) AS relasi, count(r) AS jumlah
+ORDER BY jumlah DESC;
+
+MATCH (n)
+RETURN labels(n) AS label, count(n) AS jumlah
+ORDER BY jumlah DESC;
+
+SHOW DATABASES;
+
+MATCH ()-[r]->()
+RETURN type(r) AS relasi, count(r) AS jumlah
+ORDER BY jumlah DESC;
+
+MATCH (n)
+RETURN labels(n) AS label, count(n) AS jumlah
+ORDER BY jumlah DESC;
+
+CALL db.schema.visualization();
+
+MATCH (n)
+RETURN labels(n) AS label, keys(n) AS properti
+LIMIT 20;
+
+MATCH ()-[r]->()
+RETURN type(r) AS tipeRelasi, count(*) AS jumlahRelasi
+ORDER BY jumlahRelasi DESC;
+
+MATCH (n)
+UNWIND labels(n) AS label
+RETURN label, count(*) AS jumlahNode
+ORDER BY jumlahNode DESC;
+
+MATCH (n)
+RETURN labels(n) AS label, n
+LIMIT 10;
+
+MATCH (n)-[r]->(m)
+RETURN
+    labels(n) AS nodeAwal,
+    type(r) AS relasi,
+    labels(m) AS nodeTujuan
+LIMIT 30;
+
+MATCH (n)
+RETURN labels(n) AS label, properties(n) AS properti
+LIMIT 20;
+
+MATCH (n)
+RETURN DISTINCT labels(n) AS label;
+
+MATCH (a)-[r]->(b)
+RETURN
+    labels(a) AS nodeAwal,
+    type(r) AS tipeRelasi,
+    labels(b) AS nodeTujuan,
+    properties(r) AS propertiRelasi
+LIMIT 20;
+
+MATCH (a)-[r]-(b)
+RETURN a, r, b
+LIMIT 100;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+RETURN
+  gds.util.asNode(nodeId).title AS judulFilm,
+  communityId
+LIMIT 100;
+
+MATCH (n)
+WHERE n.communityId IS NOT NULL
+RETURN
+  n.communityId AS komunitas,
+  count(n) AS jumlahAnggota
+ORDER BY komunitas;
+
+MATCH (n)
+WHERE n.communityId IS NOT NULL
+RETURN
+  labels(n) AS labelNode,
+  coalesce(n.title, n.name, toString(id(n))) AS namaNode,
+  n.communityId AS komunitas;
+
+MATCH (n)
+WHERE n.communityId IS NOT NULL
+RETURN count(n) AS jumlahNodeDenganKomunitas;
+
+MATCH (n)
+WHERE n.communityId IS NOT NULL
+RETURN
+  n.communityId AS komunitas,
+  count(n) AS jumlahAnggota,
+  collect(
+    coalesce(n.title, n.name, toString(id(n)))
+  ) AS anggota
+ORDER BY jumlahAnggota DESC;
+
+CALL gds.louvain.write(
+  'movieLouvainGraph',
+  {writeProperty: 'communityId'}
+)
+YIELD communityCount, modularity, modularities, nodePropertiesWritten
+RETURN communityCount, modularity, modularities, nodePropertiesWritten;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN
+  labels(n) AS labelNode,
+  coalesce(n.title, n.name, toString(id(n))) AS namaNode,
+  communityId
+ORDER BY communityId, labelNode, namaNode;
+
+MATCH ()-[r]->()
+RETURN type(r) AS tipeRelasi, count(r) AS jumlah
+ORDER BY jumlah DESC;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN properties(r) AS properti_relasi,
+       properties(m) AS properti_film
+LIMIT 5;
+
+MATCH (u:user)
+RETURN elementId(u) AS id_node,
+       labels(u) AS label,
+       properties(u) AS properti
+LIMIT 10;
+
+MATCH (u:user)
+RETURN elementId(u) AS id_node,
+       labels(u) AS label,
+       properties(u) AS properti
+LIMIT 10;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN properties(r) AS properti_relasi,
+       properties(m) AS properti_film
+LIMIT 5;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN properties(r) AS properti_relasi,
+       properties(m) AS properti_film
+LIMIT 5;
+
+MATCH (u:user)
+RETURN elementId(u) AS id_node,
+       labels(u) AS label,
+       properties(u) AS properti
+LIMIT 10;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN count(r) AS jumlah_relasi_rating,
+       count(DISTINCT u) AS jumlah_user,
+       count(DISTINCT m) AS jumlah_movie;
+
+MATCH (u:user)
+RETURN count(u) AS jumlah_node_user;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN labels(u) AS label_user,
+       properties(u) AS properti_user,
+       type(r) AS jenis_relasi,
+       properties(r) AS properti_relasi,
+       labels(m) AS label_movie,
+       properties(m) AS properti_movie
+LIMIT 5;
+
+MATCH (n)
+RETURN labels(n) AS label, properties(n) AS properti
+LIMIT 10;
+
+MATCH (u:user)
+RETURN properties(u) AS properti_user
+LIMIT 10;
+
+MATCH (target:User {userId: 1})-[r1:RATED]->(common:Movie)
+      <-[r2:RATED]-(other:User)
+WHERE other <> target
+  AND r1.rating >= 4
+  AND r2.rating >= 4
+
+WITH target, other, count(DISTINCT common) AS film_sama
+WHERE film_sama >= 2
+
+MATCH (other)-[r3:RATED]->(recommended:Movie)
+WHERE r3.rating >= 4
+  AND NOT EXISTS {
+      MATCH (target)-[:RATED]->(recommended)
+  }
+
+RETURN
+    recommended.title AS rekomendasi_film,
+    recommended.genres AS genre,
+    count(DISTINCT other) AS jumlah_pengguna_serupa,
+    round(avg(r3.rating) * 100) / 100.0 AS rata_rating
+ORDER BY
+    jumlah_pengguna_serupa DESC,
+    rata_rating DESC
+LIMIT 10;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN
+    u.userId AS userId,
+    m.title AS judul_film,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH (u:user)
+RETURN properties(u) AS properti_user
+LIMIT 10;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN properties(r) AS properti_rating
+LIMIT 5;
+
+MATCH (u:user)
+RETURN labels(u) AS label, properties(u) AS properti
+LIMIT 10;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN
+    u.userId AS userId,
+    m.title AS judul_film,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH ()-[r:Rated]->()
+RETURN count(r) AS jumlah_rating;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN u, r, m
+LIMIT 10;
+
+MATCH ()-[r]->()
+RETURN type(r) AS relasi, count(r) AS jumlah
+ORDER BY jumlah DESC;
+
+MATCH (n)
+RETURN labels(n) AS label, count(n) AS jumlah
+ORDER BY jumlah DESC;
+
+SHOW DATABASES;
+
+MATCH ()-[r]->()
+RETURN type(r) AS relasi, count(r) AS jumlah
+ORDER BY jumlah DESC;
+
+MATCH (n)
+RETURN labels(n) AS label, count(n) AS jumlah
+ORDER BY jumlah DESC;
+
+CALL db.schema.visualization();
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN
+    u.userId AS userId,
+    m.title AS judul_film,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN
+    u.userId AS userId,
+    m.title AS judul_film,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN
+    u.userId AS userId,
+    m.title AS judul_film,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH (target:User {userId: 1})-[r1:RATED]->(common:Movie)
+      <-[r2:RATED]-(other:User)
+WHERE other <> target
+  AND r1.rating >= 4
+  AND r2.rating >= 4
+
+WITH target, other, count(DISTINCT common) AS film_sama
+WHERE film_sama >= 2
+
+MATCH (other)-[r3:RATED]->(recommended:Movie)
+WHERE r3.rating >= 4
+  AND NOT EXISTS {
+      MATCH (target)-[:RATED]->(recommended)
+  }
+
+RETURN
+    recommended.title AS rekomendasi_film,
+    recommended.genres AS genre,
+    count(DISTINCT other) AS jumlah_pengguna_serupa,
+    round(avg(r3.rating) * 100) / 100.0 AS rata_rating
+ORDER BY
+    jumlah_pengguna_serupa DESC,
+    rata_rating DESC
+LIMIT 10;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN
+    u.userId AS userId,
+    m.title AS judul_film,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN
+    u.userId AS userId,
+    m.title AS judul_film,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN
+    u.userId AS userId,
+    m.movieId AS movieId,
+    m.title AS title,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH (n)
+RETURN labels(n) AS label, keys(n) AS properti
+LIMIT 20;
+
+MATCH ()-[r]->()
+RETURN type(r) AS tipeRelasi, count(*) AS jumlahRelasi
+ORDER BY jumlahRelasi DESC;
+
+MATCH (n)
+UNWIND labels(n) AS label
+RETURN label, count(*) AS jumlahNode
+ORDER BY jumlahNode DESC;
+
+MATCH (target:User {userId: 1})-[r1:RATED]->(liked:Movie)
+WHERE r1.rating >= 4
+
+WITH target, collect(DISTINCT liked) AS likedMovies
+
+MATCH (other:User)-[r2:RATED]->(common:Movie)
+WHERE other <> target
+  AND r2.rating >= 4
+  AND common IN likedMovies
+
+WITH target, other, count(DISTINCT common) AS similarity
+WHERE similarity > 0
+
+MATCH (other)-[r3:RATED]->(candidate:Movie)
+WHERE r3.rating >= 4
+  AND NOT EXISTS {
+    MATCH (target)-[:RATED]->(candidate)
+  }
+
+WITH candidate,
+     sum(similarity * r3.rating) / sum(similarity) AS score,
+     count(DISTINCT other) AS recommendedBy
+
+RETURN
+    candidate.movieId AS movieId,
+    candidate.title AS recommendedMovie,
+    round(score * 100) / 100.0 AS score,
+    recommendedBy
+ORDER BY score DESC
+LIMIT 10;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN properties(r) AS propertiRating
+LIMIT 10;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN
+    u.userId AS userId,
+    m.movieId AS movieId,
+    m.title AS title,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN u, r, m
+LIMIT 10;
+
+MATCH (u:User)-[r:Rated]->(m:Movie)
+RETURN u, r, m
+LIMIT 10;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+RETURN u, r, m
+LIMIT 10;
+
+MATCH (n)
+WHERE n.userId IS NOT NULL
+RETURN labels(n) AS label, properties(n) AS properti
+LIMIT 10;
+
+MATCH (n)
+WHERE n.movieId IS NOT NULL
+RETURN labels(n) AS label, properties(n) AS properti
+LIMIT 10;
+
+MATCH (n)
+WHERE n.userId IS NOT NULL
+RETURN labels(n) AS label, properties(n) AS properti
+LIMIT 10;
+
+MATCH (n)
+RETURN DISTINCT labels(n) AS label;
+
+MATCH (u:User)
+RETURN count(u) AS jumlahUser;
+
+MATCH (n)
+RETURN labels(n) AS label, n
+LIMIT 10;
+
+MATCH (u:user)
+RETURN properties(u) AS propertiUser
+LIMIT 5;
+
+MATCH (u:User)
+RETURN properties(u) AS propertiUser
+LIMIT 5;
+
+MATCH (u:User)-[r]-(m:Movie)
+RETURN
+    labels(u) AS labelUser,
+    type(r) AS relasi,
+    labels(m) AS labelMovie
+LIMIT 20;
+
+MATCH (n)-[r]->(m)
+RETURN
+    labels(n) AS nodeAwal,
+    type(r) AS relasi,
+    labels(m) AS nodeTujuan
+LIMIT 30;
+
+MATCH (n)
+RETURN labels(n) AS label, properties(n) AS properti
+LIMIT 20;
+
+MATCH (n)
+RETURN DISTINCT labels(n) AS label;
+
+MATCH (u:User)
+RETURN u
+LIMIT 3;
+
+MATCH (u:User)
+RETURN u
+LIMIT 5;
+
+MATCH (a)-[r]->(b)
+RETURN
+    labels(a) AS nodeAwal,
+    type(r) AS tipeRelasi,
+    labels(b) AS nodeTujuan,
+    properties(r) AS propertiRelasi
+LIMIT 20;
+
+MATCH (u:user)-[r:Rated]->(m:movie)
+RETURN
+    u.userId AS userId,
+    m.movieId AS movieId,
+    m.title AS title,
+    r.rating AS rating
+LIMIT 10;
+
+MATCH (a)-[r]-(b)
+RETURN a, r, b
+LIMIT 100;
+
+MATCH (a)-[r]-(b)
+WHERE a.communityId IS NOT NULL
+  AND b.communityId IS NOT NULL
+  AND a.communityId = b.communityId
+RETURN a, r, b
+LIMIT 100;
+
+CALL gds.louvain.write(
+  'movieLouvainGraph',
+  {writeProperty: 'communityId'}
+)
+YIELD communityCount, modularity, nodePropertiesWritten
+RETURN communityCount, modularity, nodePropertiesWritten;
+
+CALL gds.graph.list()
+YIELD graphName, nodeCount, relationshipCount
+RETURN graphName, nodeCount, relationshipCount;
+
+MATCH (a)-[r]-(b)
+WHERE a.communityId IS NOT NULL
+  AND b.communityId IS NOT NULL
+  AND a.communityId = b.communityId
+RETURN a, r, b
+LIMIT 100;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+RETURN
+  gds.util.asNode(nodeId).title AS judulFilm,
+  communityId
+LIMIT 100;
+
+MATCH (a)-[r]-(b)
+WHERE a.communityId IS NOT NULL
+  AND b.communityId IS NOT NULL
+  AND a.communityId = b.communityId
+RETURN a, r, b
+LIMIT 100;
+
+MATCH (n)
+WHERE n.communityId IS NOT NULL
+RETURN
+  n.communityId AS komunitas,
+  count(n) AS jumlahAnggota
+ORDER BY komunitas;
+
+MATCH (n)
+WHERE n.communityId IS NOT NULL
+RETURN
+  labels(n) AS labelNode,
+  coalesce(n.title, n.name, toString(id(n))) AS namaNode,
+  n.communityId AS komunitas;
+
+MATCH (n)
+WHERE n.communityId IS NOT NULL
+RETURN count(n) AS jumlahNodeDenganKomunitas;
+
+MATCH (a)-[r]-(b)
+WHERE a.communityId IS NOT NULL
+  AND b.communityId IS NOT NULL
+  AND a.communityId = b.communityId
+RETURN a, r, b
+LIMIT 100;
+
+MATCH (a)-[r]-(b)
+WHERE a.communityId IS NOT NULL
+  AND b.communityId IS NOT NULL
+  AND a.communityId = b.communityId
+RETURN a, r, b
+LIMIT 100;
+
+MATCH (n)
+WHERE n.communityId IS NOT NULL
+RETURN
+  n.communityId AS komunitas,
+  count(n) AS jumlahAnggota,
+  collect(
+    coalesce(n.title, n.name, toString(id(n)))
+  ) AS anggota
+ORDER BY jumlahAnggota DESC;
+
+CALL gds.louvain.write(
+  'movieLouvainGraph',
+  {writeProperty: 'communityId'}
+)
+YIELD communityCount, modularity, modularities, nodePropertiesWritten
+RETURN communityCount, modularity, modularities, nodePropertiesWritten;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+RETURN
+  gds.util.asNode(nodeId).title AS judulFilm,
+  communityId
+LIMIT 100;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+RETURN
+  gds.util.asNode(nodeId).title AS judulFilm,
+  communityId
+LIMIT 100;
+
+CALL gds.louvain.stream('movieLouvainGraph')
+YIELD nodeId, communityId
+WITH gds.util.asNode(nodeId) AS n, communityId
+RETURN
+  labels(n) AS labelNode,
+  coalesce(n.title, n.name, toString(id(n))) AS namaNode,
+  communityId
+ORDER BY communityId, labelNode, namaNode;
+
+MATCH ()-[r]->()
+RETURN type(r) AS tipeRelasi, count(r) AS jumlah
+ORDER BY jumlah DESC;
+
+MATCH (a)-[r]->(b)
+RETURN labels(a) AS nodeAwal,
+       type(r) AS tipeRelasi,
+       labels(b) AS nodeTujuan
+LIMIT 20;
+
+MATCH (u:User)
+RETURN u
+LIMIT 10;
+
+MATCH (u:user)
+RETURN u
+LIMIT 10;
+
+MATCH (m:Movie)
+RETURN m
+LIMIT 10;
+
+MATCH (u:User)
+RETURN u
+LIMIT 10;
+
+MATCH (m:Movie)-[r:HAS_GENRE]->(g)
+RETURN m, r, g
+LIMIT 100;
+
+MATCH (n)-[r:ACTS_IN]->(m)
+RETURN n, r, m
+LIMIT 100;
+
+MATCH ()-[r]->()
+RETURN DISTINCT type(r) AS tipeRelasi;
+
+MATCH (u:User)-[r]-(m:Movie)
+RETURN u, r, m
+LIMIT 100;
+
+MATCH (u:user)-[r:Rated]-(m:movie)
+RETURN u, r, m
+LIMIT 100;
+
+MATCH (u:user)-[r:SIMILAR]-(v:user)
+WHERE u.userId < v.userId
+RETURN u, r, v
+LIMIT 100;
+
+MATCH (u:user)-[r:SIMILIAR]-(v:user)
+WHERE u.userId < v.userId
+RETURN u, r, v
+LIMIT 100;
