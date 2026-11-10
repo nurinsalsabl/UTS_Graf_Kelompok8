@@ -1,0 +1,107 @@
+MATCH (u:User {userId: 1})-[r:RATED]->(m:Movie)
+WHERE r.rating >= 4
+MATCH (rec:Movie)-[s:SIMILAR]->(m)
+WHERE NOT (u)-[:RATED]->(rec) AND NOT (u)-[:RATED_TEST]->(rec)
+WITH rec, sum(s.score * r.rating) AS num, sum(s.score) AS den,
+     count(DISTINCT m) AS didukung_oleh, collect(DISTINCT m.title)[0..3] AS karena_suka
+WHERE den > 0 AND didukung_oleh >= 2
+RETURN rec.title AS film_rekomendasi, round(num / den, 2) AS prediksi_rating,
+       didukung_oleh, karena_suka
+ORDER BY prediksi_rating DESC, didukung_oleh DESC LIMIT 20;
+
+MATCH (m:Movie) WHERE m.title STARTS WITH 'Toy Story (1995)'
+MATCH (m)-[s:SIMILAR]->(n:Movie)
+RETURN n.title AS film_mirip, round(s.score, 3) AS skor
+ORDER BY skor DESC LIMIT 20;
+
+MATCH (u:User {userId: 1})-[r:RATED]->(m:Movie)
+WHERE r.rating >= 4
+MATCH (rec:Movie)-[s:SIMILAR]->(m)
+WHERE NOT (u)-[:RATED]->(rec) AND NOT (u)-[:RATED_TEST]->(rec)
+WITH u, rec, sum(s.score * r.rating) AS num, sum(s.score) AS den
+WHERE den > 0
+WITH u, rec, num / den AS pred ORDER BY pred DESC LIMIT 5
+MATCH p = (u)-[r:RATED]->(m:Movie)<-[s:SIMILAR]-(rec)
+WHERE r.rating >= 4
+RETURN p LIMIT 60;
+
+MATCH (u:User) WHERE toInteger(u.userId) % 10 = 0
+CALL (u) {
+  MATCH (u)-[r:RATED]->(m:Movie)<-[s:SIMILAR]-(rec:Movie)
+  WHERE r.rating >= 4 AND NOT (u)-[:RATED]->(rec)
+  WITH rec, sum(s.score * r.rating) AS num, sum(s.score) AS den, count(DISTINCT m) AS dukungan
+  WHERE den > 0 AND dukungan >= 2
+  WITH rec, num / den AS pred, dukungan
+  ORDER BY pred DESC, dukungan DESC LIMIT 10
+  RETURN collect(rec) AS recs
+}
+OPTIONAL MATCH (u)-[t:RATED_TEST]->(h:Movie) WHERE t.rating >= 4
+WITH u, recs, collect(h) AS relevan
+WITH size(recs) AS k, size([x IN recs WHERE x IN relevan]) AS hit, size(relevan) AS jml
+RETURN 'Item-based CF' AS metode,
+       round(avg(CASE WHEN k > 0 THEN toFloat(hit) / k END), 4) AS Precision_at_10,
+       round(avg(CASE WHEN jml > 0 THEN toFloat(hit) / jml END), 4) AS Recall_at_10,
+       count(CASE WHEN k > 0 THEN 1 END) AS jumlah_user
+UNION ALL
+MATCH (m:Movie)<-[r:RATED]-()
+WITH m, count(r) AS pop WHERE pop >= 50
+WITH m, pop ORDER BY pop DESC LIMIT 200
+WITH collect(m) AS populer
+MATCH (u:User) WHERE toInteger(u.userId) % 10 = 0
+WITH u, [x IN populer WHERE NOT (u)-[:RATED]->(x)][0..10] AS recs
+OPTIONAL MATCH (u)-[t:RATED_TEST]->(h:Movie) WHERE t.rating >= 4
+WITH u, recs, collect(h) AS relevan
+WITH size(recs) AS k, size([x IN recs WHERE x IN relevan]) AS hit, size(relevan) AS jml
+RETURN 'Baseline popularitas' AS metode,
+       round(avg(CASE WHEN k > 0 THEN toFloat(hit) / k END), 4) AS Precision_at_10,
+       round(avg(CASE WHEN jml > 0 THEN toFloat(hit) / jml END), 4) AS Recall_at_10,
+       count(CASE WHEN k > 0 THEN 1 END) AS jumlah_user;
+
+MATCH ()-[r:RATED]->() WITH avg(r.rating) AS mu
+MATCH (u:User)-[t:RATED_TEST]->(m:Movie)
+OPTIONAL MATCH (u)-[r:RATED]->(:Movie)<-[s:SIMILAR]-(m)
+WITH mu, u, m, t.rating AS aktual, sum(s.score * r.rating) AS num, sum(s.score) AS den
+WITH mu, aktual, CASE WHEN den > 0 THEN num / den END AS pred
+WITH count(*) AS n, count(pred) AS n_cf,
+     sqrt(avg((aktual - mu)^2)) AS rmse_all, avg(abs(aktual - mu)) AS mae_all,
+     sqrt(avg(CASE WHEN pred IS NOT NULL THEN (aktual - mu)^2 END)) AS rmse_sub,
+     avg(CASE WHEN pred IS NOT NULL THEN abs(aktual - mu) END) AS mae_sub,
+     sqrt(avg(CASE WHEN pred IS NOT NULL THEN (aktual - pred)^2 END)) AS rmse_cf,
+     avg(CASE WHEN pred IS NOT NULL THEN abs(aktual - pred) END) AS mae_cf
+UNWIND [
+  {metode: 'Baseline rata-rata (semua data)', rmse: rmse_all, mae: mae_all, jumlah: n},
+  {metode: 'Baseline rata-rata (subset CF)',  rmse: rmse_sub, mae: mae_sub, jumlah: n_cf},
+  {metode: 'Item-based CF',                   rmse: rmse_cf,  mae: mae_cf,  jumlah: n_cf}
+] AS x
+RETURN x.metode AS metode, round(x.rmse, 4) AS RMSE, round(x.mae, 4) AS MAE,
+       x.jumlah AS jumlah_prediksi, round(100.0 * x.jumlah / n, 2) AS coverage_persen;
+
+MATCH (a:Movie)-[s:SIMILAR]->(b:Movie)
+WITH a, b, count(s) AS n, max(s.score) AS skor
+RETURN count(*) AS jumlah_pasangan, max(n) AS maks_per_pasangan, round(avg(skor), 3) AS rata2_skor;
+
+CALL gds.graph.drop('ratingGraph') YIELD graphName;
+
+CALL gds.nodeSimilarity.write('ratingGraph', {
+  similarityMetric: 'COSINE',
+  relationshipWeightProperty: 'rating',
+  topK: 20,
+  similarityCutoff: 0.15,
+  writeRelationshipType: 'SIMILAR',
+  writeProperty: 'score'
+})
+YIELD nodesCompared, relationshipsWritten;
+
+CALL gds.graph.project('ratingGraph', ['User', 'Movie'],
+  { RATED: { orientation: 'REVERSE', properties: 'rating' } })
+YIELD graphName, nodeCount, relationshipCount;
+
+MATCH ()-[r:RATED]->() RETURN valueType(r.rating) AS tipe_rating, count(*) AS jumlah;
+
+RETURN COUNT { (:User) } AS user, COUNT { (:Movie) } AS film,
+       COUNT { ()-[:RATED]->() } AS rated, COUNT { ()-[:RATED_TEST]->() } AS rated_test;
+
+MATCH (u:User)-[r:RATED]->(m:Movie)
+WHERE (toInteger(u.userId) * 7 + toInteger(m.movieId) * 13) % 5 = 0
+CREATE (u)-[:RATED_TEST {rating: r.rating}]->(m)
+DELETE r;
